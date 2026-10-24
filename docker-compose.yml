@@ -1,0 +1,50 @@
+# Cicerone 0.8.5 con le configurazioni della presentazione.
+#
+# Non esiste un'immagine pubblicata: compose la costruisce direttamente dal
+# tag v0.8.5 su GitHub (serve solo Docker, non serve clonare il repository).
+#
+# Segreti da .env (cp .env.example .env). Config e dati sono montati sotto
+# /app, la cartella di lavoro dell'immagine, così i percorsi relativi in
+# config/*.toml valgono sia qui sia con pip.
+#
+# network_mode: host → i servizi ascoltano su 127.0.0.1 della macchina,
+# esattamente come con pip, e le config non devono dire host = "0.0.0.0".
+# Richiede Linux (o Docker Desktop con "host networking" attivo).
+
+x-cicerone: &cicerone
+  image: cicerone-presentation:0.8.5
+  build:
+    context: https://github.com/torbido-hq/cicerone.git#v0.8.5
+    dockerfile: docker/Dockerfile
+    target: runtime
+  network_mode: host
+  environment:
+    PYTHONUNBUFFERED: "1"
+    SERVE_AUTH_TOKEN: ${SERVE_AUTH_TOKEN:?impostate SERVE_AUTH_TOKEN in .env}
+    TRIGGER_AUTH_TOKEN: ${TRIGGER_AUTH_TOKEN:?impostate TRIGGER_AUTH_TOKEN in .env}
+  volumes:
+    - ./config:/app/config:ro
+    - ./scripts:/app/scripts:ro
+    - ./data:/app/data
+  restart: unless-stopped
+
+services:
+  # Job batch: un giro all'avvio, poi ogni notte alle 03:00 UTC.
+  # Retrain su richiesta: POST http://127.0.0.1:8080/trigger/retrain
+  recommender:
+    <<: *cicerone
+    command: ["start", "--config", "config/cicerone.toml"]
+
+  # API di lettura: http://127.0.0.1:8000/docs
+  serve:
+    <<: *cicerone
+    command: ["start", "--config", "config/cicerone.serve.toml"]
+
+  # Pagina di stato: http://127.0.0.1:8090
+  dashboard:
+    <<: *cicerone
+    command: ["dashboard", "--config", "config/cicerone.dashboard.toml"]
+    volumes:
+      # Lettura/scrittura: "cicerone users add" scrive dashboard_users.toml qui.
+      - ./config:/app/config
+      - ./data:/app/data

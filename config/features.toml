@@ -1,0 +1,89 @@
+# Cicerone 0.8.5 · pesi degli eventi, caratteristiche e regole di business.
+#
+# Catalogo di esempio: film. Letto dal job (cicerone.toml →
+# feature_config_path). Si modifica senza ricostruire l'immagine: vale dal
+# giro successivo.
+#
+# NOTA TOML: le chiavi "sciolte" (quantity_scaled_events, ...) devono stare
+# PRIMA di qualunque [tabella], altrimenti finiscono dentro quella tabella.
+
+# Slide "Pesare gli eventi": per questi tipi il peso è
+# peso × ln(1 + quantità). Visto 1 volta ≈ 2.8, visto 3 volte ≈ 5.5.
+quantity_scaled_events = ["watched"]
+
+# Slide "Regole di business": colonne booleane di items.parquet che devono
+# essere TUTTE vere. Una colonna mancante viene ignorata.
+item_availability_filters = ["published", "licensed"]
+
+# Con almeno un [[boost]], quanti candidati (× top_k) valutare prima dei boost.
+boost_overfetch_factor = 3
+
+# Peso di ogni tipo di evento. Un tipo non elencato qui viene SCARTATO.
+# Se la somma di una coppia (utente, film) è ≤ 0, la coppia sparisce.
+[event_weights]
+watched = 4.0
+review_positive = 5.0
+review_negative = -3.0
+watchlist = 2.0
+trailer = 1.0
+view = 0.3
+
+# Contano solo gli N eventi più recenti per (utente, film, tipo).
+[event_caps]
+view = 5
+
+# Caratteristiche degli utenti (users.parquet).
+[[user_features]]
+column = "favorite_genres"
+type = "list"
+
+[[user_features]]
+column = "country"
+type = "categorical"
+
+# Caratteristiche dei film (items.parquet).
+[[item_features]]
+column = "genre"
+type = "categorical"
+
+[[item_features]]
+column = "director_id"
+type = "categorical"
+
+[[item_features]]
+column = "decade"
+type = "categorical"
+
+[[item_features]]
+column = "duration_bucket"
+type = "categorical"
+
+# --- Regole di business (slide "Regole di business") ----------------------
+# Il dataset di esempio ha già le colonne necessarie (country,
+# available_countries, is_original): basta decommentare.
+#
+# Filtro DURO: niente film senza diritti nel paese dell'utente.
+# [[eligibility]]
+# name = "rights_in_country"
+# op = "user_in_item_list"
+# user_column = "country"
+# item_column = "available_countries"
+#
+# Spinta MORBIDA: le produzioni originali salgono (punteggio × 1.5).
+# [[boost]]
+# name = "originals"
+# kind = "boolean"
+# item_column = "is_original"
+# factor = 1.5
+
+# --- Alternativa: blending (slide "Combinare per utente") -----------------
+# Quota personalizzata che cresce con i film distinti dell'utente:
+# 0 → 0%, 1 → 2%, 5 → 50%, 10 → 99%. Il resto 70% popular, 30% latest.
+# Se attivate anche RRF in cicerone.toml, vince il blending (con warning).
+# [blending]
+# enabled = true
+# curve = "sigmoid"
+# midpoint = 5.0
+# steepness = 1.0
+# popular_share = 0.7
+# latest_date_columns = ["published_at"]

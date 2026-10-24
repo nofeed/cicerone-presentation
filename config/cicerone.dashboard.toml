@@ -1,0 +1,34 @@
+# Cicerone 0.8.5 · pagina di stato (servizio "dashboard").
+#
+# Slide "Dashboard e retrain". [output] deve puntare allo STESSO posto di
+# cicerone.toml; [input] agli stessi eventi, così la ricerca per utente
+# mostra anche i suoi ultimi eventi.
+
+[dashboard]
+enabled = true
+port = 8090
+users_path = "config/dashboard_users.toml"
+refresh_interval_seconds = 30
+history_limit = 20
+lookup_k = 10
+lookup_events = 20
+lookup_user_attrs = ["country", "favorite_genres"]
+
+# La dashboard legge cron_schedule per capire se l'ultimo giro è in
+# ritardo: tenetelo uguale a quello di cicerone.toml.
+[job]
+cron_schedule = "0 3 * * *"
+
+[output]
+kind = "dataset"
+
+[output.options]
+storage_backend = "local"
+path = "data/output"
+
+[input]
+kind = "dataset"
+
+[input.options]
+storage_backend = "local"
+path = "data/input"

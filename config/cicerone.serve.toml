@@ -1,0 +1,74 @@
+# Cicerone 0.8.5 · API di lettura (servizio "serve").
+#
+# Slide "Servire le raccomandazioni". Non allena nulla: legge quello che il
+# job ha scritto. [output] deve puntare allo STESSO posto di cicerone.toml.
+
+[job]
+mode = "serve"
+
+[serve]
+auth_token = "${SERVE_AUTH_TOKEN}"
+port = 8000
+default_k = 10
+refresh_interval_seconds = 60
+category_column = "genre"
+
+[output]
+kind = "dataset"
+# Solo con [events.online]: la stessa chiave del job (vedi sotto).
+# artifact_hmac_key = "${ARTIFACT_HMAC_KEY}"
+
+[output.options]
+storage_backend = "local"
+path = "data/output"
+
+# Obbligatorio per il caricamento della config, ma in modalità serve non
+# viene mai letto: va bene un percorso qualunque.
+[input]
+kind = "dataset"
+
+[input.options]
+storage_backend = "local"
+path = "/tmp/unused-in-serve-mode"
+
+# --- Alternativa: aggiornamenti durante il giorno (slide "Eventi") ---------
+# serve riceve gli eventi nuovi (POST /events, stesso token di [serve]) e
+# ogni 100 eventi o 60 secondi riscrive i consigli degli utenti coinvolti
+# in data/output. Risposta 202 = ricevuto, non ancora applicato.
+# Con kind = "webhook" gli eventi in attesa stanno in memoria: un riavvio
+# li perde. Alternative durevoli: "db", "s3", "redis_streams", "kafka",
+# "rabbitmq".
+# [events]
+# enabled = true
+# kind = "webhook"
+#
+# [events.incremental]
+# batch_size = 100
+# batch_window_seconds = 60
+#
+# Online training (slide "Online training"): continua ad allenare LightFM
+# sugli eventi nuovi. Richiede nel job save_model_artifact = true, e la
+# chiave di firma in [output], sia qui sia in cicerone.toml.
+# [events.online]
+# enabled = true
+# fit_partial_epochs = 1     # 0 = non allena, aggiorna solo la storia
+# fit_min_events = 100       # allena solo da 100 eventi in su
+
+# --- Alternativa: A/B test (slide "A/B test") ------------------------------
+# Lo stesso blocco va in cicerone.toml (il job scrive una lista per
+# variante) e in cicerone.serve.toml (serve assegna ogni utente a una
+# variante). Non cambiate traffic a test in corso: sposta gli utenti.
+# Con [experiment] attivo l'online training di serve è spento.
+# [experiment]
+# enabled = true
+# id = "lightfm-vs-knn"
+# primary_metric = "watched"
+#
+# [[experiment.variants]]
+# name = "control"            # eredita models da [job]
+# traffic = 0.5
+#
+# [[experiment.variants]]
+# name = "treatment"
+# traffic = 0.5
+# models = ["item_based", "collaborative", "popular"]

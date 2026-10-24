@@ -1,0 +1,5 @@
+note-relatore.md
+.env
+.venv/
+data/
+config/dashboard_users.toml

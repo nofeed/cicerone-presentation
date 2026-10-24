@@ -1,0 +1,115 @@
+# Cicerone 0.8.5 · job batch (servizio "recommender").
+#
+# Le stesse impostazioni mostrate nelle slide. Identico per Docker e pip:
+# i percorsi sono relativi alla cartella della presentazione (in Docker è
+# montata in /app) e i servizi ascoltano su 127.0.0.1 (il default).
+#
+# Le alternative mostrate nelle slide (RRF, AutoML, S3) sono qui sotto,
+# commentate: se ne attivate una, leggete la nota accanto.
+
+[job]
+mode = "batch"                      # slide "Quando gira il job"
+top_k = 10
+half_life_days = 90                 # slide "half_life_days"
+cron_schedule = "0 3 * * *"         # UTC
+feature_config_path = "config/features.toml"
+
+# Slide "Quali strategie usare": combinatore a priorità (default).
+models = ["collaborative", "item_based", "popular", "latest"]
+
+# --- Alternativa: online training (slide "Online training") ---------------
+# Il job salva il modello allenato in data/output/model.artifact, così
+# serve può continuare ad allenarlo durante il giorno. Decommentate anche
+# la chiave di firma in [output] qui sotto e la parte [events] in
+# cicerone.serve.toml.
+# save_model_artifact = true
+
+# --- Alternativa: RRF (slide "Combinare con pesi") ------------------------
+# Decommentate rrf_k e la tabella [job.model_weights]. rrf_k DEVE restare
+# qui, sopra [job.model_weights], altrimenti finisce dentro quella tabella.
+# rrf_k = 60
+
+# --- Retrain su richiesta (slide "Dashboard e retrain") -------------------
+# Il trigger è attivo: POST /trigger/retrain sulla porta 8080 con
+# "Authorization: Bearer $TRIGGER_AUTH_TOKEN".
+[job.trigger]
+enabled = true
+auth_token = "${TRIGGER_AUTH_TOKEN}"
+port = 8080
+debounce_seconds = 60
+poll_input_bucket = false
+
+# [job.model_weights]
+# collaborative = 1.0
+# item_based = 0.6
+# popular = 0.3
+# latest = 0.4
+
+# --- Alternativa: AutoML (slide "Lasciar scegliere alla macchina") --------
+# Quando è attivo ignora models / model_weights / rrf_k.
+# [job.automl]
+# enabled = true
+# n_splits = 2
+# test_days = 14
+# primary_metric = "MAP"
+
+# --- Dati: cartelle locali ------------------------------------------------
+# Il dataset di esempio (scripts/make_sample_data.py) finisce in input,
+# le raccomandazioni in output.
+[input]
+kind = "dataset"
+
+[input.options]
+storage_backend = "local"
+path = "data/input"
+
+[output]
+kind = "dataset"
+# Solo con l'online training: firma model.artifact. Stessa chiave (16+
+# caratteri) in cicerone.serve.toml, che rifiuta un file non firmato.
+# artifact_hmac_key = "${ARTIFACT_HMAC_KEY}"
+
+[output.options]
+storage_backend = "local"
+path = "data/output"
+
+# --- Alternativa: S3 (slide "Da dove leggo, dove scrivo") -----------------
+# Sostituite le due tabelle [input.options] / [output.options] qui sopra
+# (non aggiungetene una seconda) e impostate le variabili in .env.
+# Lo stesso [output.options] va copiato in cicerone.serve.toml e
+# cicerone.dashboard.toml.
+#
+# [input.options]
+# storage_backend = "s3"
+# endpoint_url = "${INPUT_S3_ENDPOINT_URL}"
+# access_key_id = "${INPUT_S3_ACCESS_KEY_ID}"
+# secret_access_key = "${INPUT_S3_SECRET_ACCESS_KEY}"
+# bucket = "${INPUT_S3_BUCKET}"
+# prefix = "datasets/latest"
+#
+# [output.options]
+# storage_backend = "s3"
+# endpoint_url = "${OUTPUT_S3_ENDPOINT_URL}"
+# access_key_id = "${OUTPUT_S3_ACCESS_KEY_ID}"
+# secret_access_key = "${OUTPUT_S3_SECRET_ACCESS_KEY}"
+# bucket = "${OUTPUT_S3_BUCKET}"
+# prefix = "recommendations/latest"
+
+# --- Alternativa: A/B test (slide "A/B test") ------------------------------
+# Lo stesso blocco va in cicerone.toml (il job scrive una lista per
+# variante) e in cicerone.serve.toml (serve assegna ogni utente a una
+# variante). Non cambiate traffic a test in corso: sposta gli utenti.
+# Con [experiment] attivo l'online training di serve è spento.
+# [experiment]
+# enabled = true
+# id = "lightfm-vs-knn"
+# primary_metric = "watched"
+#
+# [[experiment.variants]]
+# name = "control"            # eredita models da [job]
+# traffic = 0.5
+#
+# [[experiment.variants]]
+# name = "treatment"
+# traffic = 0.5
+# models = ["item_based", "collaborative", "popular"]
