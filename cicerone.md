@@ -1145,7 +1145,7 @@ Grazie! Domande?
 
 Documentazione: **cicerone.dev** · Codice: **github.com/torbido-hq/cicerone**
 
-Scrivetemi: **nicholas.wieland@gmail.com**
+Scrivetemi: **ngw@nofeed.org**
 
 Stasera, nel dubbio: *Riunione che Poteva Essere una Mail*.
 
